@@ -1,0 +1,51 @@
+Bootstrap: docker
+From: ubuntu:bionic
+
+%labels
+Maintainer eric.burgueno@plantandfood.co.nz
+Version 0.4.1
+
+%environment
+  ROOTSYS=/opt/root
+  LD_LIBRARY_PATH=/opt/root/lib
+
+%post
+  ## Download build prerequisites
+  apt-get update
+  apt-get -y install apt-transport-https build-essential cmake gcc git language-pack-en-base libbz2-dev libcurl4-openssl-dev liblzma-dev libncurses5-dev libncursesw5-dev libreadline-dev libssl-dev make unzip wget zlib1g-dev
+  update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
+
+  ## Install ROOT
+  cd /opt/ && wget https://root.cern.ch/download/root_v6.13.02.Linux-ubuntu16-x86_64-gcc5.4.tar.gz
+  tar -xvf root_v6.13.02.Linux-ubuntu16-x86_64-gcc5.4.tar.gz
+  export ROOTSYS=/opt/root
+  export PATH=$PATH:$ROOTSYS/bin
+  export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$ROOTSYS/lib
+
+  ## Install samtools
+  cd /opt/ && wget https://github.com/samtools/samtools/releases/download/1.9/samtools-1.9.tar.bz2
+  tar -xjf samtools-1.9.tar.bz2
+  cd samtools-1.9
+  ./configure
+  make all all-htslib
+  make install install-htslib
+
+  ## Install CNVnator
+  cd /opt/ && wget https://github.com/abyzovlab/CNVnator/releases/download/v0.4.1/CNVnator_v0.4.1.zip
+  unzip CNVnator_v0.4.1.zip
+  cd CNVnator_v0.4.1/src/
+  ln -s /opt/samtools-1.9 /opt/CNVnator_v0.4.1/src/samtools
+  make LIBS="-lcrypto"
+  for f in cnvnator cnvnator2VCF.pl plotbaf.py plotcircular.py plotrdbaf.py; do install -Dm0755 $f /usr/local/bin; done
+
+## Cleanup
+  cd /opt
+  rm -f root_v6.13.02.Linux-ubuntu16-x86_64-gcc5.4.tar.gz samtools-1.9.tar.bz2 CNVnator_v0.4.1.zip
+
+%runscript
+if [ $# -eq 0 ]; then
+  /bin/echo -e "This Singularity image cannot provide a single entrypoint. Please use \"$SINGULARITY_NAME <cmd>\" or \"singularity exec $SINGULARITY_NAME <cmd>\", where <cmd> is one of the following:\n"
+  exec echo cnvnator cnvnator2VCF.pl plotbaf.py plotcircular.py plotrdbaf.py
+else
+  exec "$@"
+fi
